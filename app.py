@@ -26,7 +26,12 @@ bot = None
 
 @app.route('/')
 def index():
-    """Main dashboard page"""
+    """Main dashboard page - Premium Version"""
+    return render_template('dashboard_premium.html')
+
+@app.route('/classic')
+def classic_dashboard():
+    """Classic dashboard page"""
     return render_template('dashboard.html')
 
 @app.route('/api/status')
