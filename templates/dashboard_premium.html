@@ -732,14 +732,51 @@
             const timestamp = new Date().toLocaleTimeString();
             logs.unshift({ timestamp, message, type });
             if (logs.length > 50) logs.pop();
+            updateLogsDisplay();
+        }
+        
+        // Update logs from server
+        function updateLogsFromServer(serverLogs) {
+            // Convert server log levels to types
+            const levelMap = {
+                'info': 'info',
+                'warning': 'warning',
+                'error': 'error',
+                'success': 'success',
+                'debug': 'info'
+            };
             
+            logs = serverLogs.map(log => ({
+                timestamp: log.timestamp,
+                message: log.message,
+                type: levelMap[log.level] || 'info'
+            }));
+            
+            updateLogsDisplay();
+        }
+        
+        // Update logs display
+        function updateLogsDisplay() {
             const logsContainer = document.getElementById('logsContainer');
-            logsContainer.innerHTML = logs.map(log => `
+            if (logs.length === 0) {
+                logsContainer.innerHTML = `
+                    <div class="log-entry info">
+                        <span class="log-timestamp">[--:--:--]</span>
+                        <span>Waiting for bot activity...</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            logsContainer.innerHTML = logs.slice(0, 50).map(log => `
                 <div class="log-entry ${log.type}">
                     <span class="log-timestamp">[${log.timestamp}]</span>
                     <span>${log.message}</span>
                 </div>
             `).join('');
+            
+            // Auto-scroll to latest (top)
+            logsContainer.scrollTop = 0;
         }
         
         // Start Bot
@@ -803,15 +840,22 @@
         // Update Dashboard
         async function updateDashboard() {
             try {
-                const [statusRes, positionsRes, tradesRes] = await Promise.all([
+                const [statusRes, positionsRes, tradesRes, logsRes] = await Promise.all([
                     axios.get('/api/status'),
                     axios.get('/api/positions'),
-                    axios.get('/api/trades')
+                    axios.get('/api/trades'),
+                    axios.get('/api/logs')
                 ]);
                 
                 const status = statusRes.data;
                 const positions = positionsRes.data.positions || [];
                 const trades = tradesRes.data.trades || [];
+                const serverLogs = logsRes.data.logs || [];
+                
+                // Update logs from server
+                if (serverLogs.length > 0) {
+                    updateLogsFromServer(serverLogs);
+                }
                 
                 // Update Status Badge
                 const statusBadge = document.getElementById('statusBadge');

@@ -9,10 +9,12 @@ from flask_cors import CORS
 from datetime import datetime
 import json
 import logging
+from collections import deque
+import threading
 
 from src.simple_trading_bot import SimpleTradingBot
 
-# Setup logging
+# Setup logging with custom handler
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -21,8 +23,23 @@ logging.basicConfig(
 app = Flask(__name__)
 CORS(app)
 
-# Global bot instance
+# Global bot instance and logs
 bot = None
+web_logs = deque(maxlen=100)  # Store last 100 log messages
+
+# Custom log handler to capture logs for web interface
+class WebLogHandler(logging.Handler):
+    def emit(self, record):
+        log_entry = {
+            'timestamp': datetime.now().strftime('%H:%M:%S'),
+            'level': record.levelname.lower(),
+            'message': record.getMessage()
+        }
+        web_logs.append(log_entry)
+
+# Add web log handler
+web_handler = WebLogHandler()
+logging.getLogger().addHandler(web_handler)
 
 @app.route('/')
 def index():
@@ -132,6 +149,39 @@ def get_trades():
         return jsonify({'trades': []})
     
     return jsonify({'trades': bot.get_trades()})
+
+@app.route('/api/logs')
+def get_logs():
+    """Get recent log entries"""
+    return jsonify({'logs': list(web_logs)})
+
+@app.route('/api/market-data')
+def get_market_data():
+    """Get real-time market data"""
+    try:
+        from src.data_fetcher import MarketDataFetcher
+        fetcher = MarketDataFetcher()
+        
+        market_data = []
+        symbols = ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+        
+        for symbol in symbols:
+            try:
+                ticker = fetcher.get_ticker(symbol)
+                if ticker:
+                    market_data.append({
+                        'symbol': symbol,
+                        'price': ticker.get('last', 0),
+                        'change_24h': ticker.get('percentage', 0),
+                        'volume': ticker.get('baseVolume', 0)
+                    })
+            except Exception as e:
+                logging.error(f"Error fetching {symbol}: {e}")
+        
+        return jsonify({'market_data': market_data})
+    except Exception as e:
+        logging.error(f"Error in market data endpoint: {e}")
+        return jsonify({'market_data': []})
 
 if __name__ == '__main__':
     import os
