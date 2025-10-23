@@ -11,35 +11,49 @@ logger = logging.getLogger(__name__)
 class MarketDataFetcher:
     """Fetches real-time and historical crypto market data"""
     
-    def __init__(self, exchange_name: str = 'binance'):
+    def __init__(self, exchange_name: str = 'auto'):
         self.config = Config()
         self.exchange_name = exchange_name
         self.exchange = self._initialize_exchange()
         
     def _initialize_exchange(self):
-        """Initialize exchange connection"""
-        try:
-            if self.exchange_name == 'binance':
-                exchange = ccxt.binance({
-                    'apiKey': self.config.BINANCE_API_KEY,
-                    'secret': self.config.BINANCE_API_SECRET,
+        """Initialize exchange connection with automatic fallback"""
+        # Try exchanges in order of global accessibility
+        exchanges_to_try = [
+            ('kucoin', 'KuCoin'),
+            ('okx', 'OKX'),
+            ('bybit', 'Bybit'),
+            ('kraken', 'Kraken'),
+            ('gateio', 'Gate.io'),
+            ('binance', 'Binance')  # Try Binance last
+        ]
+        
+        # If specific exchange requested, try it first
+        if self.exchange_name != 'auto' and self.exchange_name != 'binance':
+            exchanges_to_try.insert(0, (self.exchange_name, self.exchange_name.title()))
+        
+        for exchange_id, exchange_name in exchanges_to_try:
+            try:
+                logger.info(f"Trying to connect to {exchange_name}...")
+                exchange_class = getattr(ccxt, exchange_id)
+                exchange = exchange_class({
                     'enableRateLimit': True,
-                    'options': {'defaultType': 'future'}  # For futures trading
+                    'timeout': 30000
                 })
-            else:
-                exchange = getattr(ccxt, self.exchange_name)({
-                    'enableRateLimit': True
-                })
-            
-            # Test connection
-            exchange.load_markets()
-            logger.info(f"Connected to {self.exchange_name}")
-            return exchange
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize exchange: {e}")
-            # Return a demo exchange for paper trading
-            return ccxt.binance({'enableRateLimit': True})
+                
+                # Test connection
+                exchange.load_markets()
+                self.exchange_name = exchange_id
+                logger.info(f"✓ Successfully connected to {exchange_name}!")
+                return exchange
+                
+            except Exception as e:
+                logger.warning(f"✗ {exchange_name} failed: {str(e)[:100]}")
+                continue
+        
+        # If all fail, raise error
+        logger.error("Failed to connect to any exchange! Check your internet connection.")
+        raise Exception("Could not connect to any cryptocurrency exchange")
     
     def get_ohlcv(self, symbol: str, timeframe: str = '15m', 
                    limit: int = 500, since: Optional[int] = None) -> pd.DataFrame:
@@ -74,16 +88,18 @@ class MarketDataFetcher:
             ticker = self.exchange.fetch_ticker(symbol)
             return {
                 'symbol': symbol,
-                'last': ticker['last'],
-                'bid': ticker['bid'],
-                'ask': ticker['ask'],
-                'volume': ticker['quoteVolume'],
-                'change_24h': ticker['percentage'],
+                'last': ticker.get('last', 0),
+                'bid': ticker.get('bid', 0),
+                'ask': ticker.get('ask', 0),
+                'volume': ticker.get('quoteVolume', 0),
+                'baseVolume': ticker.get('baseVolume', 0),
+                'percentage': ticker.get('percentage', 0),
+                'change_24h': ticker.get('percentage', 0),
                 'timestamp': datetime.now()
             }
         except Exception as e:
             logger.error(f"Error fetching ticker for {symbol}: {e}")
-            return {}
+            return None
     
     def get_order_book(self, symbol: str, limit: int = 20) -> Dict:
         """Get order book data"""
