@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: ai-trading-bot
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.6
+      - key: TRADING_MODE
+        value: paper
+      - key: TRADING_PAIRS
+        value: BTC/USDT,ETH/USDT,SOL/USDT
+      - key: DEFAULT_TRADE_AMOUNT
+        value: 100
+      - key: MAX_PORTFOLIO_RISK
+        value: 0.02
+      - key: STOP_LOSS_PERCENTAGE
+        value: 0.05
+      - key: TAKE_PROFIT_PERCENTAGE
+        value: 0.15
+      - key: MAX_DAILY_LOSS
+        value: 500
+      - key: MAX_OPEN_POSITIONS
+        value: 5
+      - key: PREDICTION_CONFIDENCE_THRESHOLD
+        value: 0.55
+
