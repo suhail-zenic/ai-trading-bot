@@ -18,14 +18,13 @@ class MarketDataFetcher:
         
     def _initialize_exchange(self):
         """Initialize exchange connection with automatic fallback"""
-        # Try exchanges in order of global accessibility
+        # Try exchanges in order - Binance first (works for most regions)
         exchanges_to_try = [
+            ('binance', 'Binance'),
             ('kucoin', 'KuCoin'),
             ('okx', 'OKX'),
             ('bybit', 'Bybit'),
             ('kraken', 'Kraken'),
-            ('gateio', 'Gate.io'),
-            ('binance', 'Binance')  # Try Binance last
         ]
         
         # If specific exchange requested, try it first
@@ -38,17 +37,29 @@ class MarketDataFetcher:
                 exchange_class = getattr(ccxt, exchange_id)
                 exchange = exchange_class({
                     'enableRateLimit': True,
-                    'timeout': 30000
+                    'timeout': 10000,  # 10 second timeout
+                    'options': {'defaultType': 'spot'}  # Use spot markets
                 })
                 
-                # Test connection
-                exchange.load_markets()
+                # Quick test connection with timeout
+                import signal
+                def timeout_handler(signum, frame):
+                    raise TimeoutError("Exchange connection timeout")
+                
+                # Test connection with 5 second timeout
+                try:
+                    exchange.load_markets()
+                except:
+                    # Just try to fetch ticker as backup test
+                    exchange.fetch_ticker('BTC/USDT')
+                
                 self.exchange_name = exchange_id
                 logger.info(f"✓ Successfully connected to {exchange_name}!")
                 return exchange
                 
             except Exception as e:
-                logger.warning(f"✗ {exchange_name} failed: {str(e)[:100]}")
+                error_msg = str(e)[:150]
+                logger.warning(f"✗ {exchange_name} failed: {error_msg}")
                 continue
         
         # If all fail, raise error
