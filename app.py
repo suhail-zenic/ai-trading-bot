@@ -328,6 +328,17 @@ def diagnostics():
         'BINANCE_API_SECRET': 'SET' if os.getenv('BINANCE_API_SECRET') else 'NOT SET'
     }
     
+    # Try to fetch real balance from Binance
+    balance_info = None
+    balance_error = None
+    if config.BINANCE_API_KEY and config.BINANCE_API_SECRET:
+        try:
+            from src.data_fetcher import MarketDataFetcher
+            fetcher = MarketDataFetcher()
+            balance_info = fetcher.get_account_balance('USDT')
+        except Exception as e:
+            balance_error = str(e)
+    
     # Check configuration
     diagnostics_info = {
         'environment_variables': env_vars,
@@ -336,8 +347,14 @@ def diagnostics():
             'is_live_mode': config.TRADING_MODE == 'live',
             'api_keys_configured': bool(config.BINANCE_API_KEY and config.BINANCE_API_SECRET)
         },
-        'status': 'OK' if config.TRADING_MODE == 'live' and config.BINANCE_API_KEY else 'WARNING',
-        'message': 'Live mode configured correctly' if config.TRADING_MODE == 'live' else 'Running in PAPER mode - set TRADING_MODE=live in Render environment variables'
+        'binance_balance': {
+            'total': balance_info['total'] if balance_info else None,
+            'free': balance_info['free'] if balance_info else None,
+            'used': balance_info['used'] if balance_info else None,
+            'error': balance_error
+        } if config.TRADING_MODE == 'live' else 'N/A (paper mode)',
+        'status': 'OK' if config.TRADING_MODE == 'live' and config.BINANCE_API_KEY and balance_info else 'WARNING',
+        'message': 'Live mode configured correctly' if config.TRADING_MODE == 'live' and balance_info else 'Running in PAPER mode - set TRADING_MODE=live in Render environment variables'
     }
     
     return jsonify(diagnostics_info)

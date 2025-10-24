@@ -73,10 +73,12 @@ class SimpleTradingBot:
                     total_balance = balance_info['total']
                     used_balance = balance_info['used']
                     
-                    logger.info(f"[LIVE] Binance Balance Updated:")
-                    logger.info(f"   Total: {total_balance:.2f} USDT")
-                    logger.info(f"   Free:  {real_balance:.2f} USDT (available for trading)")
-                    logger.info(f"   Used:  {used_balance:.2f} USDT (in open orders)")
+                    logger.info(f"[LIVE] Binance Balance: {total_balance:.2f} USDT | Available: {real_balance:.2f} USDT")
+                    
+                    # Only show "used" balance if there's actually something locked
+                    if used_balance > 0.01:  # Ignore dust amounts
+                        logger.warning(f"   ⚠️ Locked: {used_balance:.2f} USDT (in open orders or frozen)")
+                        logger.warning(f"   Check Binance for: open orders, convert dust, or other locks")
                     
                     # Use free balance (available for trading)
                     self.capital = real_balance
@@ -85,7 +87,7 @@ class SimpleTradingBot:
                     if not hasattr(self, '_initial_balance_set'):
                         self.initial_capital = total_balance
                         self._initial_balance_set = True
-                        logger.info(f"[LIVE] Initial balance recorded: ${total_balance:.2f}")
+                        logger.info(f"[LIVE] Starting balance recorded: ${total_balance:.2f} USDT")
                     
                     return True
                 else:
