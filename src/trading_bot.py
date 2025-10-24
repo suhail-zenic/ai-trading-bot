@@ -89,7 +89,7 @@ class CryptoTradingBot:
                 results = self.ml_predictor.train(df)
                 
                 if results['status'] == 'success':
-                    logger.info(f"✓ Models trained successfully for {symbol}")
+                    logger.info(f"[OK] Models trained successfully for {symbol}")
                     for model_name, metrics in results['models'].items():
                         if 'accuracy' in metrics:
                             logger.info(f"  {model_name}: {metrics['accuracy']:.2%} accuracy")
@@ -99,7 +99,7 @@ class CryptoTradingBot:
         
         # Save models
         self.ml_predictor.save_models()
-        logger.info("✓ Initialization complete!")
+        logger.info("[OK] Initialization complete!")
     
     def analyze_symbol(self, symbol: str) -> Dict:
         """Analyze a single trading pair"""
@@ -197,13 +197,48 @@ class CryptoTradingBot:
                 take_profit=position_info['recommended_take_profit']
             )
             
-            logger.info(f"✓ Paper trade executed - Position ID: {position_id}")
+            logger.info(f"[OK] Paper trade executed - Position ID: {position_id}")
             return position_id
         
         else:
-            # Live trading (implement exchange integration)
-            logger.warning("Live trading not implemented yet - use paper mode")
-            return None
+            # Live trading - execute real order on exchange
+            logger.warning("="*60)
+            logger.warning("[LIVE] LIVE TRADING MODE - PLACING REAL ORDER")
+            logger.warning("="*60)
+            
+            # Place market order on exchange
+            order_result = self.data_fetcher.place_market_order(
+                symbol=symbol,
+                side=side.lower(),
+                amount=position_info['position_size']
+            )
+            
+            if order_result and order_result.get('success'):
+                # Track position in risk manager
+                actual_price = order_result.get('average') or order_result.get('price') or current_price
+                actual_amount = order_result.get('filled') or order_result.get('amount')
+                
+                position_id = self.risk_manager.add_position(
+                    symbol=symbol,
+                    side=side,
+                    entry_price=actual_price,
+                    quantity=actual_amount,
+                    stop_loss=position_info['recommended_stop_loss'],
+                    take_profit=position_info['recommended_take_profit']
+                )
+                
+                logger.info(f"[OK] LIVE TRADE EXECUTED!")
+                logger.info(f"  Order ID: {order_result.get('order_id')}")
+                logger.info(f"  Actual Price: ${actual_price:.2f}")
+                logger.info(f"  Actual Amount: {actual_amount:.6f}")
+                logger.info(f"  Total Cost: ${order_result.get('cost', 0):.2f}")
+                logger.info(f"  Position ID: {position_id}")
+                
+                return position_id
+            else:
+                error_msg = order_result.get('message', 'Unknown error') if order_result else 'No response'
+                logger.error(f"[FAIL] Live order failed: {error_msg}")
+                return None
     
     def monitor_positions(self):
         """Monitor and manage open positions"""
@@ -270,9 +305,7 @@ class CryptoTradingBot:
                     logger.error(f"Failed to analyze {symbol}: {analysis.get('message')}")
                     continue
             except Exception as e:
-                logger.error(f"Error analyzing {symbol}: {e}")
-                import traceback
-                traceback.print_exc()
+                logger.error(f"Error analyzing {symbol}: {e}", exc_info=True)
                 continue
             
             # Get the enhanced signal (combines all strategies + ML)
@@ -328,7 +361,7 @@ class CryptoTradingBot:
         
         logger.info("-"*60)
     
-    def start(self, interval_minutes: int = 15):
+    def start(self, interval_minutes: int = 30):
         """Start the trading bot"""
         logger.info(f"\nStarting trading bot (checking every {interval_minutes} minutes)...")
         logger.info("Press Ctrl+C to stop\n")
@@ -389,6 +422,6 @@ if __name__ == "__main__":
     # Initialize and train models
     bot.initialize()
     
-    # Start trading
-    bot.start(interval_minutes=15)
+    # Start trading (30-60 min cycle recommended)
+    bot.start(interval_minutes=30)
 

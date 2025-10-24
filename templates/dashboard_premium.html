@@ -816,19 +816,58 @@
         }
         
         // Toggle Trading Mode
-        function toggleMode() {
+        async function toggleMode() {
             const currentMode = document.getElementById('tradingMode').textContent;
-            const newMode = currentMode === 'PAPER' ? 'LIVE' : 'PAPER';
+            const newMode = currentMode === 'PAPER' ? 'live' : 'paper';
             
-            if (newMode === 'LIVE') {
-                if (!confirm('⚠️ WARNING: Switching to LIVE mode will use REAL MONEY! Are you sure?')) {
+            if (newMode === 'live') {
+                if (!confirm('⚠️ WARNING: Switching to LIVE mode will use REAL MONEY!\n\nThis will place real orders on Binance.\nLosses are REAL and PERMANENT.\n\nAre you absolutely sure?')) {
                     return;
                 }
             }
             
-            document.getElementById('tradingMode').textContent = newMode;
-            document.getElementById('modeToggleText').textContent = `Switch to ${currentMode}`;
-            addLog(`Switched to ${newMode} trading mode`, 'warning');
+            try {
+                addLog(`Switching to ${newMode.toUpperCase()} mode...`, 'warning');
+                const response = await axios.post('/api/mode/switch', { mode: newMode });
+                
+                if (response.data.success) {
+                    document.getElementById('tradingMode').textContent = newMode.toUpperCase();
+                    document.getElementById('modeToggleText').textContent = `Switch to ${currentMode}`;
+                    addLog(`✓ ${response.data.message}`, 'success');
+                    if (response.data.note) {
+                        addLog(`ℹ ${response.data.note}`, 'info');
+                    }
+                    // Refresh mode display
+                    await loadCurrentMode();
+                } else {
+                    addLog(`✗ ${response.data.message}`, 'error');
+                }
+            } catch (error) {
+                addLog(`Error switching mode: ${error.message}`, 'error');
+            }
+        }
+        
+        // Load Current Mode
+        async function loadCurrentMode() {
+            try {
+                const response = await axios.get('/api/mode');
+                const mode = response.data.mode.toUpperCase();
+                document.getElementById('tradingMode').textContent = mode;
+                const toggleText = mode === 'PAPER' ? 'Switch to LIVE' : 'Switch to PAPER';
+                document.getElementById('modeToggleText').textContent = toggleText;
+                
+                // Update mode indicator color
+                const modeElement = document.getElementById('tradingMode');
+                if (mode === 'LIVE') {
+                    modeElement.style.color = '#ef4444';
+                    modeElement.style.fontWeight = 'bold';
+                } else {
+                    modeElement.style.color = '#10b981';
+                    modeElement.style.fontWeight = 'bold';
+                }
+            } catch (error) {
+                console.error('Error loading mode:', error);
+            }
         }
         
         // Refresh Data
@@ -840,6 +879,10 @@
         // Update Dashboard
         async function updateDashboard() {
             try {
+                // Add refresh indicator
+                const statusBadge = document.getElementById('statusBadge');
+                const originalText = statusBadge ? statusBadge.textContent : '';
+                
                 const [statusRes, positionsRes, tradesRes, logsRes] = await Promise.all([
                     axios.get('/api/status'),
                     axios.get('/api/positions'),
@@ -852,31 +895,44 @@
                 const trades = tradesRes.data.trades || [];
                 const serverLogs = logsRes.data.logs || [];
                 
+                // Debug: Log received data
+                console.log('Dashboard Update:', {
+                    status: status.status,
+                    capital: status.capital,
+                    positions: status.portfolio.open_positions,
+                    trades: status.stats.total_trades,
+                    pnl: status.stats.total_pnl
+                });
+                
                 // Update logs from server
                 if (serverLogs.length > 0) {
                     updateLogsFromServer(serverLogs);
                 }
                 
                 // Update Status Badge
-                const statusBadge = document.getElementById('statusBadge');
                 const statusText = document.getElementById('statusText');
                 if (status.is_running) {
-                    statusBadge.className = 'status-badge running';
-                    statusText.textContent = 'RUNNING';
+                    if (statusBadge) statusBadge.className = 'status-badge running';
+                    if (statusText) statusText.textContent = 'RUNNING';
                     document.getElementById('startBtn').disabled = true;
                     document.getElementById('stopBtn').disabled = false;
                 } else {
-                    statusBadge.className = 'status-badge stopped';
-                    statusText.textContent = 'STOPPED';
+                    if (statusBadge) statusBadge.className = 'status-badge stopped';
+                    if (statusText) statusText.textContent = 'STOPPED';
                     document.getElementById('startBtn').disabled = false;
                     document.getElementById('stopBtn').disabled = true;
                 }
                 
-                // Update Cards
-                document.getElementById('capitalValue').textContent = '$' + (status.capital || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                document.getElementById('totalPnlValue').textContent = '$' + (status.stats.total_pnl || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                document.getElementById('positionsValue').textContent = status.portfolio.open_positions || 0;
-                document.getElementById('winRateValue').textContent = ((status.stats.win_rate || 0) * 100).toFixed(1) + '%';
+                // Update Cards with safe element checks
+                const capitalEl = document.getElementById('capitalValue');
+                const pnlEl = document.getElementById('totalPnlValue');
+                const positionsEl = document.getElementById('positionsValue');
+                const winRateEl = document.getElementById('winRateValue');
+                
+                if (capitalEl) capitalEl.textContent = '$' + (status.capital || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                if (pnlEl) pnlEl.textContent = '$' + (status.stats.total_pnl || 0).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                if (positionsEl) positionsEl.textContent = status.portfolio.open_positions || 0;
+                if (winRateEl) winRateEl.textContent = ((status.stats.win_rate || 0) * 100).toFixed(1) + '%';
                 
                 // Update P&L Trend
                 const pnlTrend = document.getElementById('pnlTrend');
@@ -1028,6 +1084,7 @@
         document.addEventListener('DOMContentLoaded', async () => {
             initChart();
             addLog('Dashboard initialized', 'success');
+            await loadCurrentMode();  // Load trading mode
             await updateDashboard();
             
             // Auto-refresh every 2 seconds for real-time updates

@@ -209,6 +209,9 @@
                     <button class="btn-start" id="startBtn" onclick="startBot()">Start Bot</button>
                     <button class="btn-stop" id="stopBtn" onclick="stopBot()" disabled>Stop Bot</button>
                     <button class="btn-refresh" onclick="refreshData()">Refresh</button>
+                    <button class="btn-refresh" onclick="toggleMode()" id="modeSwitchBtn" style="background: #f59e0b;">
+                        <span id="modeSwitchText">Switch to LIVE</span>
+                    </button>
                 </div>
             </div>
         </header>
@@ -333,64 +336,136 @@
                 });
         }
         
+        async function toggleMode() {
+            const currentMode = document.getElementById('tradingMode').textContent;
+            const newMode = currentMode === 'PAPER' ? 'live' : 'paper';
+            
+            if (newMode === 'live') {
+                if (!confirm('⚠️ WARNING: Switching to LIVE mode will use REAL MONEY!\n\nThis will place real orders on Binance.\nLosses are REAL and PERMANENT.\n\nAre you absolutely sure?')) {
+                    return;
+                }
+            }
+            
+            try {
+                const response = await fetch('/api/mode/switch', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({mode: newMode})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert(`✓ ${data.message}`);
+                    await loadCurrentMode();
+                } else {
+                    alert(`✗ ${data.message}`);
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        }
+        
+        async function loadCurrentMode() {
+            try {
+                const response = await fetch('/api/mode');
+                const data = await response.json();
+                const mode = data.mode.toUpperCase();
+                
+                document.getElementById('tradingMode').textContent = mode;
+                const switchText = mode === 'PAPER' ? 'Switch to LIVE' : 'Switch to PAPER';
+                document.getElementById('modeSwitchText').textContent = switchText;
+                
+                // Update mode color
+                const modeElement = document.getElementById('tradingMode');
+                if (mode === 'LIVE') {
+                    modeElement.style.color = '#ef4444';
+                    modeElement.style.fontWeight = 'bold';
+                } else {
+                    modeElement.style.color = '#10b981';
+                    modeElement.style.fontWeight = 'bold';
+                }
+            } catch (error) {
+                console.error('Error loading mode:', error);
+            }
+        }
+        
         function updateStatus() {
             fetch('/api/status')
                 .then(res => res.json())
                 .then(data => {
+                    console.log('Status Update:', data);  // Debug log
+                    
                     const statusEl = document.getElementById('botStatus');
                     const startBtn = document.getElementById('startBtn');
                     const stopBtn = document.getElementById('stopBtn');
                     
                     if (data.is_running) {
-                        statusEl.textContent = 'RUNNING';
-                        statusEl.className = 'status running';
-                        startBtn.disabled = true;
-                        stopBtn.disabled = false;
+                        if (statusEl) {
+                            statusEl.textContent = 'RUNNING';
+                            statusEl.className = 'status running';
+                        }
+                        if (startBtn) startBtn.disabled = true;
+                        if (stopBtn) stopBtn.disabled = false;
                     } else {
-                        statusEl.textContent = 'STOPPED';
-                        statusEl.className = 'status stopped';
-                        startBtn.disabled = false;
-                        stopBtn.disabled = true;
+                        if (statusEl) {
+                            statusEl.textContent = 'STOPPED';
+                            statusEl.className = 'status stopped';
+                        }
+                        if (startBtn) startBtn.disabled = false;
+                        if (stopBtn) stopBtn.disabled = true;
                     }
                     
-                    if (data.config) {
-                        document.getElementById('tradingMode').textContent = data.config.trading_mode.toUpperCase();
-                    }
-                    
-                    if (data.portfolio) {
-                        updatePortfolio(data.portfolio, data.capital);
-                    }
-                    
-                    if (data.stats) {
-                        updateStats(data.stats);
-                    }
+                    // Always update portfolio and stats if they exist in response
+                    updatePortfolio(data.portfolio, data.capital);
+                    updateStats(data.stats);
+                })
+                .catch(err => {
+                    console.error('Error updating status:', err);
                 });
         }
         
         function updatePortfolio(portfolio, capital) {
-            document.getElementById('capital').textContent = '$' + (capital || 0).toFixed(2);
-            document.getElementById('openPositions').textContent = portfolio.open_positions || 0;
-            
-            const unrealizedPnl = portfolio.unrealized_pnl || 0;
+            const capitalEl = document.getElementById('capital');
+            const positionsEl = document.getElementById('openPositions');
             const unrealizedEl = document.getElementById('unrealizedPnl');
-            unrealizedEl.textContent = '$' + unrealizedPnl.toFixed(2);
-            unrealizedEl.className = 'metric-value ' + (unrealizedPnl >= 0 ? 'positive' : 'negative');
-            
-            const dailyPnl = portfolio.daily_pnl || 0;
             const dailyEl = document.getElementById('dailyPnl');
-            dailyEl.textContent = '$' + dailyPnl.toFixed(2);
-            dailyEl.className = 'metric-value ' + (dailyPnl >= 0 ? 'positive' : 'negative');
+            
+            if (capitalEl) capitalEl.textContent = '$' + (capital || 0).toFixed(2);
+            if (positionsEl) positionsEl.textContent = portfolio?.open_positions || 0;
+            
+            if (unrealizedEl) {
+                const unrealizedPnl = portfolio?.unrealizedPnl || 0;
+                unrealizedEl.textContent = '$' + unrealizedPnl.toFixed(2);
+                unrealizedEl.className = 'metric-value ' + (unrealizedPnl >= 0 ? 'positive' : 'negative');
+            }
+            
+            if (dailyEl) {
+                const dailyPnl = portfolio?.daily_pnl || 0;
+                dailyEl.textContent = '$' + dailyPnl.toFixed(2);
+                dailyEl.className = 'metric-value ' + (dailyPnl >= 0 ? 'positive' : 'negative');
+            }
+            
+            console.log('Portfolio updated:', { capital, positions: portfolio?.open_positions, pnl: portfolio?.daily_pnl });
         }
         
         function updateStats(stats) {
-            document.getElementById('totalTrades').textContent = stats.total_trades || 0;
-            document.getElementById('winRate').textContent = ((stats.win_rate || 0) * 100).toFixed(1) + '%';
-            document.getElementById('profitFactor').textContent = (stats.profit_factor || 0).toFixed(2);
-            
-            const totalPnl = stats.total_pnl || 0;
+            const tradesEl = document.getElementById('totalTrades');
+            const winRateEl = document.getElementById('winRate');
+            const pfEl = document.getElementById('profitFactor');
             const pnlEl = document.getElementById('totalPnl');
-            pnlEl.textContent = '$' + totalPnl.toFixed(2);
-            pnlEl.className = 'metric-value ' + (totalPnl >= 0 ? 'positive' : 'negative');
+            
+            if (tradesEl) tradesEl.textContent = stats?.total_trades || 0;
+            if (winRateEl) winRateEl.textContent = ((stats?.win_rate || 0) * 100).toFixed(1) + '%';
+            if (pfEl) pfEl.textContent = (stats?.profit_factor || 0).toFixed(2);
+            
+            if (pnlEl) {
+                const totalPnl = stats?.total_pnl || 0;
+                pnlEl.textContent = '$' + totalPnl.toFixed(2);
+                pnlEl.className = 'metric-value ' + (totalPnl >= 0 ? 'positive' : 'negative');
+            }
+            
+            console.log('Stats updated:', { trades: stats?.total_trades, winRate: stats?.win_rate, pnl: stats?.total_pnl });
         }
         
         function analyzeSymbol() {
@@ -512,6 +587,7 @@
         }
         
         // Initial load
+        loadCurrentMode();  // Load trading mode
         updateStatus();
         updatePositions();
         updateTrades();

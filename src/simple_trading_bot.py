@@ -58,7 +58,7 @@ class SimpleTradingBot:
             
             if balance_info and balance_info['free'] > 0:
                 real_balance = balance_info['free']
-                logger.info(f"✅ Real Binance balance fetched: {real_balance:.2f} USDT")
+                logger.info(f"[OK] Real Binance balance fetched: {real_balance:.2f} USDT")
                 logger.info(f"   Total: {balance_info['total']:.2f} USDT")
                 logger.info(f"   Free: {balance_info['free']:.2f} USDT")
                 logger.info(f"   Used: {balance_info['used']:.2f} USDT")
@@ -67,9 +67,9 @@ class SimpleTradingBot:
                 self.initial_capital = real_balance
                 self.capital = real_balance
                 
-                logger.info(f"🚀 Bot will trade with REAL balance: ${real_balance:.2f}")
+                logger.info(f"[LIVE] Bot will trade with REAL balance: ${real_balance:.2f}")
             else:
-                logger.warning(f"⚠️ Could not fetch real balance, using .env value: ${INITIAL_CAPITAL:.2f}")
+                logger.warning(f"[WARN] Could not fetch real balance, using .env value: ${INITIAL_CAPITAL:.2f}")
                 logger.warning("   Make sure API key has 'Enable Reading' permission")
         else:
             logger.info(f"Paper mode - using simulated balance: ${INITIAL_CAPITAL:.2f}")

@@ -1,7 +1,6 @@
 import ccxt
 import pandas as pd
-import numpy as np
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, List, Optional
 import logging
 from config import Config
@@ -55,15 +54,15 @@ class MarketDataFetcher:
                     ticker = exchange.fetch_ticker('BTC/USDT')
                     if ticker and 'last' in ticker:
                         self.exchange_name = exchange_id
-                        logger.info(f"✓ Successfully connected to {exchange_name}!")
+                        logger.info(f"[OK] Successfully connected to {exchange_name}!")
                         return exchange
                 except Exception as test_error:
-                    logger.warning(f"✗ {exchange_name} connection test failed: {str(test_error)[:100]}")
+                    logger.warning(f"[FAIL] {exchange_name} connection test failed: {str(test_error)[:100]}")
                     continue
                 
             except Exception as e:
                 error_msg = str(e)[:150]
-                logger.warning(f"✗ {exchange_name} failed: {error_msg}")
+                logger.warning(f"[FAIL] {exchange_name} failed: {error_msg}")
                 continue
         
         # If all fail, raise error
@@ -263,4 +262,122 @@ class MarketDataFetcher:
         except Exception as e:
             logger.error(f"Error fetching balance for {currency}: {e}")
             return None
+    
+    def place_market_order(self, symbol: str, side: str, amount: float, test_mode: bool = False) -> Dict:
+        """
+        Place a market order on the exchange
+        
+        Args:
+            symbol: Trading pair (e.g., 'BTC/USDT')
+            side: 'buy' or 'sell'
+            amount: Amount in base currency (e.g., 0.001 BTC)
+            test_mode: If True, use test order endpoint (Binance only)
+            
+        Returns:
+            Order result dictionary or None if error
+        """
+        try:
+            if not self.config.BINANCE_API_KEY or not self.config.BINANCE_API_SECRET:
+                logger.error("API credentials not configured - cannot place orders")
+                return None
+            
+            logger.info(f"{'TEST ' if test_mode else ''}Placing {side.upper()} market order: {amount} {symbol}")
+            
+            # Use test order for safety (Binance only)
+            if test_mode and hasattr(self.exchange, 'create_test_order'):
+                order = self.exchange.create_test_order(symbol, 'market', side, amount)
+                logger.info(f"[OK] Test order successful: {order}")
+            else:
+                order = self.exchange.create_market_order(symbol, side, amount)
+                logger.info(f"[OK] Live order placed: {order.get('id', 'N/A')}")
+            
+            return {
+                'success': True,
+                'order_id': order.get('id'),
+                'symbol': symbol,
+                'side': side,
+                'type': 'market',
+                'amount': order.get('amount', amount),
+                'filled': order.get('filled', 0),
+                'price': order.get('price', 0),
+                'average': order.get('average', 0),
+                'cost': order.get('cost', 0),
+                'status': order.get('status', 'unknown'),
+                'timestamp': datetime.now(),
+                'raw_order': order
+            }
+            
+        except ccxt.InsufficientFunds as e:
+            logger.error(f"Insufficient funds for {side} {amount} {symbol}: {e}")
+            return {'success': False, 'error': 'insufficient_funds', 'message': str(e)}
+        except ccxt.InvalidOrder as e:
+            logger.error(f"Invalid order for {symbol}: {e}")
+            return {'success': False, 'error': 'invalid_order', 'message': str(e)}
+        except Exception as e:
+            logger.error(f"Error placing {side} order for {symbol}: {e}")
+            return {'success': False, 'error': 'unknown', 'message': str(e)}
+    
+    def place_limit_order(self, symbol: str, side: str, amount: float, price: float, test_mode: bool = False) -> Dict:
+        """
+        Place a limit order on the exchange
+        
+        Args:
+            symbol: Trading pair (e.g., 'BTC/USDT')
+            side: 'buy' or 'sell'
+            amount: Amount in base currency
+            price: Limit price
+            test_mode: If True, use test order endpoint
+            
+        Returns:
+            Order result dictionary or None if error
+        """
+        try:
+            if not self.config.BINANCE_API_KEY or not self.config.BINANCE_API_SECRET:
+                logger.error("API credentials not configured - cannot place orders")
+                return None
+            
+            logger.info(f"{'TEST ' if test_mode else ''}Placing {side.upper()} limit order: {amount} {symbol} @ ${price}")
+            
+            if test_mode and hasattr(self.exchange, 'create_test_order'):
+                order = self.exchange.create_test_order(symbol, 'limit', side, amount, price)
+                logger.info(f"[OK] Test limit order successful")
+            else:
+                order = self.exchange.create_limit_order(symbol, side, amount, price)
+                logger.info(f"[OK] Live limit order placed: {order.get('id', 'N/A')}")
+            
+            return {
+                'success': True,
+                'order_id': order.get('id'),
+                'symbol': symbol,
+                'side': side,
+                'type': 'limit',
+                'amount': order.get('amount', amount),
+                'price': price,
+                'status': order.get('status', 'open'),
+                'timestamp': datetime.now(),
+                'raw_order': order
+            }
+            
+        except Exception as e:
+            logger.error(f"Error placing limit order for {symbol}: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def cancel_order(self, order_id: str, symbol: str) -> bool:
+        """Cancel an open order"""
+        try:
+            self.exchange.cancel_order(order_id, symbol)
+            logger.info(f"[OK] Order {order_id} cancelled for {symbol}")
+            return True
+        except Exception as e:
+            logger.error(f"Error cancelling order {order_id}: {e}")
+            return False
+    
+    def get_open_orders(self, symbol: str = None) -> List[Dict]:
+        """Get all open orders"""
+        try:
+            orders = self.exchange.fetch_open_orders(symbol)
+            return orders
+        except Exception as e:
+            logger.error(f"Error fetching open orders: {e}")
+            return []
 

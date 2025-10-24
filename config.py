@@ -1,7 +1,8 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# Force reload on every import to pick up .env changes
+load_dotenv(override=True)
 
 class Config:
     # API Configuration
@@ -11,23 +12,23 @@ class Config:
     # Trading Configuration
     TRADING_MODE = os.getenv('TRADING_MODE', 'paper')
     DEFAULT_TRADE_AMOUNT = float(os.getenv('DEFAULT_TRADE_AMOUNT', 100))
-    MAX_PORTFOLIO_RISK = float(os.getenv('MAX_PORTFOLIO_RISK', 0.02))
-    STOP_LOSS_PERCENTAGE = float(os.getenv('STOP_LOSS_PERCENTAGE', 0.05))
-    TAKE_PROFIT_PERCENTAGE = float(os.getenv('TAKE_PROFIT_PERCENTAGE', 0.15))
+    MAX_PORTFOLIO_RISK = float(os.getenv('MAX_PORTFOLIO_RISK', 0.015))  # 1.5% risk per trade
+    STOP_LOSS_PERCENTAGE = float(os.getenv('STOP_LOSS_PERCENTAGE', 0.015))  # 1.5% stop loss
+    TAKE_PROFIT_PERCENTAGE = float(os.getenv('TAKE_PROFIT_PERCENTAGE', 0.04))  # 4% take profit
     
-    # Trading Pairs
-    TRADING_PAIRS = os.getenv('TRADING_PAIRS', 'BTC/USDT,ETH/USDT,SOL/USDT,BNB/USDT').split(',')
+    # Trading Pairs (High liquidity coins only)
+    TRADING_PAIRS = os.getenv('TRADING_PAIRS', 'BTC/USDT,ETH/USDT').split(',')
     
     # Risk Management
     MAX_DAILY_LOSS = float(os.getenv('MAX_DAILY_LOSS', 500))
-    MAX_OPEN_POSITIONS = int(os.getenv('MAX_OPEN_POSITIONS', 5))
+    MAX_OPEN_POSITIONS = int(os.getenv('MAX_OPEN_POSITIONS', 2))  # Max 1-2 open trades
     
     # Database
     DATABASE_URL = os.getenv('DATABASE_URL', 'sqlite:///trading.db')
     
     # Timeframes for analysis
-    TIMEFRAMES = ['1m', '5m', '15m', '1h', '4h', '1d']
-    PRIMARY_TIMEFRAME = '15m'
+    TIMEFRAMES = ['1m', '5m', '15m', '30m', '1h', '4h', '1d']
+    PRIMARY_TIMEFRAME = '15m'  # 15-30 min recommended
     
     # ML Model Configuration
     MODEL_RETRAIN_INTERVAL = 24  # hours
@@ -53,7 +54,7 @@ class Config:
 # NOTE: Set your actual capital in USDT (e.g., 23 for ₹2000, 50 for ₹4000, etc.)
 INITIAL_CAPITAL = float(os.getenv('INITIAL_CAPITAL', '10000'))  # Default 10000 for paper, change for live
 TRADING_MODE = os.getenv('TRADING_MODE', 'paper')
-TRADING_PAIRS = os.getenv('TRADING_PAIRS', 'BTC/USDT,ETH/USDT,SOL/USDT').split(',')
+TRADING_PAIRS = os.getenv('TRADING_PAIRS', 'BTC/USDT,ETH/USDT').split(',')  # High liquidity pairs only
 
 # Position sizing - adjust based on your capital
 # For small capital (<50 USDT): use 0.30-0.40 (30-40%)
@@ -62,8 +63,8 @@ TRADING_PAIRS = os.getenv('TRADING_PAIRS', 'BTC/USDT,ETH/USDT,SOL/USDT').split('
 POSITION_SIZE_PCT = float(os.getenv('POSITION_SIZE_PCT', '0.15'))
 
 # Risk management
-STOP_LOSS_PCT = float(os.getenv('STOP_LOSS_PCT', '0.04'))  # 4% stop loss
-TAKE_PROFIT_PCT = float(os.getenv('TAKE_PROFIT_PCT', '0.10'))  # 10% take profit
-MAX_POSITIONS = int(os.getenv('MAX_POSITIONS', '5'))  # Max positions at once
-TRADING_CYCLE_MINUTES = int(os.getenv('TRADING_CYCLE_MINUTES', '5'))  # Minutes between cycles
+STOP_LOSS_PCT = float(os.getenv('STOP_LOSS_PCT', '0.015'))  # 1.5% stop loss
+TAKE_PROFIT_PCT = float(os.getenv('TAKE_PROFIT_PCT', '0.04'))  # 4% take profit
+MAX_POSITIONS = int(os.getenv('MAX_POSITIONS', '2'))  # Max 1-2 positions at once
+TRADING_CYCLE_MINUTES = int(os.getenv('TRADING_CYCLE_MINUTES', '30'))  # 30-60 min between cycles
 

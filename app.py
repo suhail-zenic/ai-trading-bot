@@ -100,21 +100,47 @@ def get_status():
     elif not status['running']:
         health_message = 'Bot stopped'
     
+    # Calculate unrealized P&L from open positions only
+    unrealized_pnl = 0
+    for symbol, pos in bot.positions.items():
+        try:
+            ticker = bot.data_fetcher.get_ticker(symbol)
+            if ticker:
+                current_price = ticker['last']
+                entry_price = pos.get('entry_price', current_price)
+                amount = pos.get('amount', 0)
+                position_pnl = (current_price - entry_price) * amount
+                unrealized_pnl += position_pnl
+        except:
+            pass
+    
+    # Calculate daily P&L (from closed trades today)
+    daily_pnl = 0
+    today = datetime.now().date()
+    for trade in bot.trades:
+        try:
+            trade_date = datetime.fromisoformat(trade.get('timestamp', '')).date()
+            if trade_date == today:
+                daily_pnl += trade.get('profit', 0)
+        except:
+            pass
+    
     return jsonify({
         'status': 'running' if status['running'] else 'stopped',
         'is_running': status['running'],
         'is_healthy': status.get('is_healthy', False),
-        'capital': status['capital'],
+        'capital': status.get('total_value', status['capital']),  # Total account value
+        'free_capital': status['capital'],  # Available cash
         'portfolio': {
             'open_positions': status['num_positions'],
-            'unrealized_pnl': status['profit'],
-            'daily_pnl': status['profit']
+            'unrealized_pnl': unrealized_pnl,  # Only from open positions
+            'daily_pnl': daily_pnl  # Only today's closed trades
         },
         'stats': {
             'total_trades': status['num_trades'],
             'win_rate': win_rate,
             'profit_factor': profit_factor,
-            'total_pnl': status['profit']
+            'total_pnl': status['profit']  # Cumulative all-time P&L
         },
         'health': {
             'last_heartbeat': status.get('last_heartbeat'),
@@ -152,6 +178,84 @@ def stop_bot():
         return jsonify({'success': True, 'message': 'Bot stopped successfully'})
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)})
+
+@app.route('/api/mode')
+def get_mode():
+    """Get current trading mode"""
+    from config import Config
+    config = Config()
+    return jsonify({
+        'mode': config.TRADING_MODE,
+        'is_live': config.TRADING_MODE == 'live',
+        'api_configured': bool(config.BINANCE_API_KEY and config.BINANCE_API_SECRET)
+    })
+
+@app.route('/api/mode/switch', methods=['POST'])
+def switch_mode():
+    """Switch trading mode (requires bot to be stopped)"""
+    global bot
+    
+    # Check if bot is running
+    if bot is not None and bot.running:
+        return jsonify({
+            'success': False, 
+            'message': 'Please stop the bot before switching modes'
+        })
+    
+    try:
+        import os
+        from pathlib import Path
+        
+        # Read current .env
+        env_path = Path('.env')
+        env_vars = {}
+        
+        if env_path.exists():
+            with open(env_path, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#') and '=' in line:
+                        key, value = line.split('=', 1)
+                        env_vars[key.strip()] = value.strip()
+        
+        # Get requested mode from request
+        data = request.get_json() or {}
+        new_mode = data.get('mode', '').lower()
+        
+        if new_mode not in ['paper', 'live']:
+            return jsonify({
+                'success': False,
+                'message': 'Invalid mode. Must be "paper" or "live"'
+            })
+        
+        # Update mode
+        env_vars['TRADING_MODE'] = new_mode
+        
+        # Write back to .env
+        with open(env_path, 'w') as f:
+            f.write("# AI Trading Bot Configuration\n")
+            f.write(f"# Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+            
+            for key, value in env_vars.items():
+                f.write(f"{key}={value}\n")
+        
+        # Reload environment variables from .env file
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+        os.environ['TRADING_MODE'] = new_mode
+        
+        return jsonify({
+            'success': True,
+            'message': f'Switched to {new_mode.upper()} mode!',
+            'new_mode': new_mode,
+            'note': 'Mode updated - you can now start the bot'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        })
 
 @app.route('/api/positions')
 def get_positions():
