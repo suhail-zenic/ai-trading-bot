@@ -16,8 +16,11 @@ services:
       # Trading Configuration for LIVE mode
       - key: TRADING_MODE
         value: live
+      # INITIAL_CAPITAL is optional for live mode
+      # The bot will automatically fetch your real USDT balance from Binance
+      # Only needed for paper mode simulation
       - key: INITIAL_CAPITAL
-        value: 22.50
+        value: 10000
       - key: TRADING_PAIRS
         value: BTC/USDT
       - key: STOP_LOSS_PCT

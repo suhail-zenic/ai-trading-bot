@@ -48,31 +48,12 @@ class SimpleTradingBot:
             logger.error(f"Failed to initialize MarketDataFetcher: {e}", exc_info=True)
             raise
         
-        # Try to fetch real balance from Binance
-        self.initial_capital = INITIAL_CAPITAL  # Fallback value
+        # Initialize capital tracking
+        self.initial_capital = INITIAL_CAPITAL  # Fallback for paper mode
         self.capital = INITIAL_CAPITAL
         
-        if TRADING_MODE == 'live':
-            logger.info("Live mode detected - fetching real balance from Binance...")
-            balance_info = self.data_fetcher.get_account_balance('USDT')
-            
-            if balance_info and balance_info['free'] > 0:
-                real_balance = balance_info['free']
-                logger.info(f"[OK] Real Binance balance fetched: {real_balance:.2f} USDT")
-                logger.info(f"   Total: {balance_info['total']:.2f} USDT")
-                logger.info(f"   Free: {balance_info['free']:.2f} USDT")
-                logger.info(f"   Used: {balance_info['used']:.2f} USDT")
-                
-                # Use real balance instead of .env value
-                self.initial_capital = real_balance
-                self.capital = real_balance
-                
-                logger.info(f"[LIVE] Bot will trade with REAL balance: ${real_balance:.2f}")
-            else:
-                logger.warning(f"[WARN] Could not fetch real balance, using .env value: ${INITIAL_CAPITAL:.2f}")
-                logger.warning("   Make sure API key has 'Enable Reading' permission")
-        else:
-            logger.info(f"Paper mode - using simulated balance: ${INITIAL_CAPITAL:.2f}")
+        # Fetch initial balance
+        self.refresh_balance_from_exchange()
             
         self.positions = {}  # {symbol: {'amount': 0.1, 'entry_price': 50000, 'stop_loss': 48000, 'take_profit': 55000}}
         self.trades = []
@@ -80,6 +61,45 @@ class SimpleTradingBot:
         self.thread = None
         self.last_heartbeat = datetime.now()
         logger.info(f"Bot initialized with ${self.capital:.2f} capital")
+    
+    def refresh_balance_from_exchange(self):
+        """Fetch real-time balance from Binance (for live mode)"""
+        if TRADING_MODE == 'live':
+            try:
+                balance_info = self.data_fetcher.get_account_balance('USDT')
+                
+                if balance_info and balance_info['free'] >= 0:
+                    real_balance = balance_info['free']
+                    total_balance = balance_info['total']
+                    used_balance = balance_info['used']
+                    
+                    logger.info(f"[LIVE] Binance Balance Updated:")
+                    logger.info(f"   Total: {total_balance:.2f} USDT")
+                    logger.info(f"   Free:  {real_balance:.2f} USDT (available for trading)")
+                    logger.info(f"   Used:  {used_balance:.2f} USDT (in open orders)")
+                    
+                    # Use free balance (available for trading)
+                    self.capital = real_balance
+                    
+                    # Set initial capital on first fetch
+                    if not hasattr(self, '_initial_balance_set'):
+                        self.initial_capital = total_balance
+                        self._initial_balance_set = True
+                        logger.info(f"[LIVE] Initial balance recorded: ${total_balance:.2f}")
+                    
+                    return True
+                else:
+                    logger.warning(f"[WARN] Could not fetch real balance from Binance")
+                    logger.warning("   Make sure API key has 'Enable Reading' permission")
+                    return False
+                    
+            except Exception as e:
+                logger.error(f"[ERROR] Failed to fetch balance from Binance: {e}")
+                return False
+        else:
+            # Paper mode - use simulated balance
+            logger.info(f"[PAPER] Using simulated balance: ${INITIAL_CAPITAL:.2f}")
+            return True
         
     def get_trading_signal(self, df, symbol):
         """Simple but effective trading strategy using RSI, MACD, and Bollinger Bands"""
@@ -190,7 +210,13 @@ class SimpleTradingBot:
             }
             
             # Update capital
-            self.capital -= position_value
+            if TRADING_MODE == 'paper':
+                # Paper mode: track manually
+                self.capital -= position_value
+            else:
+                # Live mode: refresh from Binance immediately after order
+                logger.info("Refreshing balance after BUY order...")
+                self.refresh_balance_from_exchange()
             
             # Record trade
             trade = {
@@ -267,7 +293,13 @@ class SimpleTradingBot:
                 logger.info(f"[PAPER] Simulated SELL order (no real trade)")
             
             # Update capital
-            self.capital += position_value
+            if TRADING_MODE == 'paper':
+                # Paper mode: track manually
+                self.capital += position_value
+            else:
+                # Live mode: refresh from Binance immediately after order
+                logger.info("Refreshing balance after SELL order...")
+                self.refresh_balance_from_exchange()
             
             # Record trade
             trade = {
@@ -333,6 +365,11 @@ class SimpleTradingBot:
         """Main trading cycle"""
         try:
             logger.info(f"=== TRADING CYCLE - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
+            
+            # Refresh balance from Binance (live mode only)
+            if TRADING_MODE == 'live':
+                logger.info("Refreshing balance from Binance...")
+                self.refresh_balance_from_exchange()
             
             # Check existing positions for stop loss / take profit
             logger.info("Checking existing positions for SL/TP...")
