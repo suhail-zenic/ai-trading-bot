@@ -306,6 +306,42 @@ def get_market_data():
         logging.error(f"Error in market data endpoint: {e}")
         return jsonify({'market_data': []})
 
+@app.route('/api/diagnostics')
+def diagnostics():
+    """Diagnostic endpoint to verify environment configuration"""
+    import os
+    from config import Config
+    
+    config = Config()
+    
+    # Get all trading-related environment variables
+    env_vars = {
+        'TRADING_MODE': os.getenv('TRADING_MODE', 'NOT SET'),
+        'INITIAL_CAPITAL': os.getenv('INITIAL_CAPITAL', 'NOT SET'),
+        'TRADING_PAIRS': os.getenv('TRADING_PAIRS', 'NOT SET'),
+        'POSITION_SIZE_PCT': os.getenv('POSITION_SIZE_PCT', 'NOT SET'),
+        'MAX_POSITIONS': os.getenv('MAX_POSITIONS', 'NOT SET'),
+        'STOP_LOSS_PCT': os.getenv('STOP_LOSS_PCT', 'NOT SET'),
+        'TAKE_PROFIT_PCT': os.getenv('TAKE_PROFIT_PCT', 'NOT SET'),
+        'TRADING_CYCLE_MINUTES': os.getenv('TRADING_CYCLE_MINUTES', 'NOT SET'),
+        'BINANCE_API_KEY': 'SET' if os.getenv('BINANCE_API_KEY') else 'NOT SET',
+        'BINANCE_API_SECRET': 'SET' if os.getenv('BINANCE_API_SECRET') else 'NOT SET'
+    }
+    
+    # Check configuration
+    diagnostics_info = {
+        'environment_variables': env_vars,
+        'config_values': {
+            'TRADING_MODE': config.TRADING_MODE,
+            'is_live_mode': config.TRADING_MODE == 'live',
+            'api_keys_configured': bool(config.BINANCE_API_KEY and config.BINANCE_API_SECRET)
+        },
+        'status': 'OK' if config.TRADING_MODE == 'live' and config.BINANCE_API_KEY else 'WARNING',
+        'message': 'Live mode configured correctly' if config.TRADING_MODE == 'live' else 'Running in PAPER mode - set TRADING_MODE=live in Render environment variables'
+    }
+    
+    return jsonify(diagnostics_info)
+
 if __name__ == '__main__':
     import os
     
