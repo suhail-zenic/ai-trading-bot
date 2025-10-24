@@ -1,3 +1,6 @@
+# Environment variables (NEVER commit API keys!)
+.env
+
 # Python
 __pycache__/
 *.py[cod]
@@ -24,10 +27,6 @@ wheels/
 venv/
 ENV/
 env/
-.venv
-
-# Environment Variables
-.env
 
 # IDEs
 .vscode/
@@ -38,18 +37,22 @@ env/
 
 # Logs
 *.log
-trading_bot.log
+*.log.*
+trading_bot.log*
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Models (optional - remove if you want to commit trained models)
-# models/*.pkl
-# models/*.h5
 
 # Database
 *.db
 *.sqlite
 *.sqlite3
 
+# Models
+models/*.pkl
+
+# Temporary files
+*.tmp
+*.bak
+*.cache

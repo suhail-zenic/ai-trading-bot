@@ -16,6 +16,12 @@ class MarketDataFetcher:
         self.exchange_name = exchange_name
         self.exchange = self._initialize_exchange()
         
+        # Set API credentials if available (for authenticated requests like balance)
+        if self.config.BINANCE_API_KEY and self.config.BINANCE_API_SECRET:
+            self.exchange.apiKey = self.config.BINANCE_API_KEY
+            self.exchange.secret = self.config.BINANCE_API_SECRET
+            logger.info("API credentials configured for authenticated requests")
+        
     def _initialize_exchange(self):
         """Initialize exchange connection with automatic fallback"""
         # Try exchanges in order - Binance first (works for most regions)
@@ -37,25 +43,23 @@ class MarketDataFetcher:
                 exchange_class = getattr(ccxt, exchange_id)
                 exchange = exchange_class({
                     'enableRateLimit': True,
-                    'timeout': 10000,  # 10 second timeout
-                    'options': {'defaultType': 'spot'}  # Use spot markets
+                    'timeout': 15000,  # 15 second timeout
+                    'options': {
+                        'defaultType': 'spot',
+                        'recvWindow': 10000  # 10 second receive window
+                    }
                 })
                 
-                # Quick test connection with timeout
-                import signal
-                def timeout_handler(signum, frame):
-                    raise TimeoutError("Exchange connection timeout")
-                
-                # Test connection with 5 second timeout
+                # Test connection with a simple ticker fetch (faster than load_markets)
                 try:
-                    exchange.load_markets()
-                except:
-                    # Just try to fetch ticker as backup test
-                    exchange.fetch_ticker('BTC/USDT')
-                
-                self.exchange_name = exchange_id
-                logger.info(f"✓ Successfully connected to {exchange_name}!")
-                return exchange
+                    ticker = exchange.fetch_ticker('BTC/USDT')
+                    if ticker and 'last' in ticker:
+                        self.exchange_name = exchange_id
+                        logger.info(f"✓ Successfully connected to {exchange_name}!")
+                        return exchange
+                except Exception as test_error:
+                    logger.warning(f"✗ {exchange_name} connection test failed: {str(test_error)[:100]}")
+                    continue
                 
             except Exception as e:
                 error_msg = str(e)[:150]
@@ -67,7 +71,7 @@ class MarketDataFetcher:
         raise Exception("Could not connect to any cryptocurrency exchange")
     
     def get_ohlcv(self, symbol: str, timeframe: str = '15m', 
-                   limit: int = 500, since: Optional[int] = None) -> pd.DataFrame:
+                   limit: int = 500, since: Optional[int] = None, retries: int = 2) -> pd.DataFrame:
         """
         Fetch OHLCV (Open, High, Low, Close, Volume) data
         
@@ -76,22 +80,47 @@ class MarketDataFetcher:
             timeframe: Candle timeframe (e.g., '1m', '5m', '15m', '1h', '4h', '1d')
             limit: Number of candles to fetch
             since: Timestamp in milliseconds
+            retries: Number of retry attempts
             
         Returns:
             DataFrame with OHLCV data
         """
-        try:
-            ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, since, limit)
-            
-            df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
-            df.set_index('timestamp', inplace=True)
-            
-            return df
-            
-        except Exception as e:
-            logger.error(f"Error fetching OHLCV for {symbol}: {e}")
-            return pd.DataFrame()
+        import time
+        
+        for attempt in range(retries + 1):
+            try:
+                ohlcv = self.exchange.fetch_ohlcv(symbol, timeframe, since, limit)
+                
+                if not ohlcv or len(ohlcv) == 0:
+                    logger.warning(f"Empty OHLCV data for {symbol}")
+                    return pd.DataFrame()
+                
+                df = pd.DataFrame(ohlcv, columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
+                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+                df.set_index('timestamp', inplace=True)
+                
+                return df
+                
+            except ccxt.NetworkError as e:
+                if attempt < retries:
+                    logger.warning(f"Network error fetching {symbol}, retrying ({attempt + 1}/{retries})...")
+                    time.sleep(2)  # Wait 2 seconds before retry
+                else:
+                    logger.error(f"Network error fetching OHLCV for {symbol} after {retries} retries: {e}")
+                    return pd.DataFrame()
+                    
+            except ccxt.RateLimitExceeded as e:
+                logger.warning(f"Rate limit exceeded for {symbol}, waiting...")
+                time.sleep(5)  # Wait longer for rate limits
+                if attempt >= retries:
+                    logger.error(f"Rate limit exceeded for {symbol} after retries")
+                    return pd.DataFrame()
+                    
+            except Exception as e:
+                logger.error(f"Error fetching OHLCV for {symbol}: {e}")
+                return pd.DataFrame()
+        
+        return pd.DataFrame()
     
     def get_ticker(self, symbol: str) -> Dict:
         """Get current ticker information"""
@@ -199,4 +228,39 @@ class MarketDataFetcher:
             return 'bearish'
         else:
             return 'very_bearish'
+    
+    def get_account_balance(self, currency: str = 'USDT') -> Dict:
+        """
+        Fetch account balance from exchange
+        
+        Args:
+            currency: Currency to fetch balance for (default: USDT)
+            
+        Returns:
+            Dictionary with balance info or None if error
+        """
+        try:
+            # Fetch balance from exchange
+            balance = self.exchange.fetch_balance()
+            
+            if currency in balance:
+                return {
+                    'currency': currency,
+                    'total': balance[currency].get('total', 0),
+                    'free': balance[currency].get('free', 0),
+                    'used': balance[currency].get('used', 0),
+                    'timestamp': datetime.now()
+                }
+            else:
+                logger.warning(f"Currency {currency} not found in balance")
+                return {
+                    'currency': currency,
+                    'total': 0,
+                    'free': 0,
+                    'used': 0,
+                    'timestamp': datetime.now()
+                }
+        except Exception as e:
+            logger.error(f"Error fetching balance for {currency}: {e}")
+            return None
 

@@ -4,15 +4,25 @@ Run this directly to see detailed logs
 """
 import sys
 import logging
+from logging.handlers import RotatingFileHandler
 from src.trading_bot import CryptoTradingBot
 
-# Setup detailed logging
+# Setup detailed logging with rotation
+# Rotation: Max 10 MB per file, keep 5 backup files = 50 MB total
+rotating_handler = RotatingFileHandler(
+    'trading_bot.log',
+    maxBytes=10*1024*1024,  # 10 MB
+    backupCount=5,           # Keep 5 old files
+    mode='a'
+)
+rotating_handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(sys.stdout),
-        logging.FileHandler('trading_bot.log')
+        rotating_handler
     ]
 )
 

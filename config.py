@@ -50,12 +50,20 @@ class Config:
     BACKTEST_INITIAL_CAPITAL = 10000
 
 # Module-level constants for simple bot
-INITIAL_CAPITAL = 10000
+# NOTE: Set your actual capital in USDT (e.g., 23 for ₹2000, 50 for ₹4000, etc.)
+INITIAL_CAPITAL = float(os.getenv('INITIAL_CAPITAL', '10000'))  # Default 10000 for paper, change for live
 TRADING_MODE = os.getenv('TRADING_MODE', 'paper')
 TRADING_PAIRS = os.getenv('TRADING_PAIRS', 'BTC/USDT,ETH/USDT,SOL/USDT').split(',')
-POSITION_SIZE_PCT = 0.15  # 15% of capital per position (MORE aggressive)
-STOP_LOSS_PCT = 0.04  # 4% stop loss (tighter)
-TAKE_PROFIT_PCT = 0.10  # 10% take profit (quicker exits for faster turnover)
-MAX_POSITIONS = 5  # Max 5 positions at once (MORE trades)
-TRADING_CYCLE_MINUTES = 5  # Run cycle every 5 minutes (FASTER trading)
+
+# Position sizing - adjust based on your capital
+# For small capital (<50 USDT): use 0.30-0.40 (30-40%)
+# For medium capital (50-500 USDT): use 0.15-0.20 (15-20%)
+# For large capital (>500 USDT): use 0.10-0.15 (10-15%)
+POSITION_SIZE_PCT = float(os.getenv('POSITION_SIZE_PCT', '0.15'))
+
+# Risk management
+STOP_LOSS_PCT = float(os.getenv('STOP_LOSS_PCT', '0.04'))  # 4% stop loss
+TAKE_PROFIT_PCT = float(os.getenv('TAKE_PROFIT_PCT', '0.10'))  # 10% take profit
+MAX_POSITIONS = int(os.getenv('MAX_POSITIONS', '5'))  # Max positions at once
+TRADING_CYCLE_MINUTES = int(os.getenv('TRADING_CYCLE_MINUTES', '5'))  # Minutes between cycles
 

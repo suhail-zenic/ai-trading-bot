@@ -58,6 +58,7 @@ def get_status():
         return jsonify({
             'status': 'stopped',
             'is_running': False,
+            'is_healthy': False,
             'capital': 0,
             'portfolio': {
                 'open_positions': 0,
@@ -69,6 +70,11 @@ def get_status():
                 'win_rate': 0,
                 'profit_factor': 0,
                 'total_pnl': 0
+            },
+            'health': {
+                'last_heartbeat': None,
+                'seconds_since_heartbeat': 0,
+                'status_message': 'Bot not started'
             }
         })
     
@@ -87,9 +93,17 @@ def get_status():
     if total_losses > 0:
         profit_factor = total_wins / total_losses
     
+    # Health status message
+    health_message = 'Healthy and active'
+    if not status.get('is_healthy', False):
+        health_message = 'Warning: No heartbeat for 10+ minutes'
+    elif not status['running']:
+        health_message = 'Bot stopped'
+    
     return jsonify({
         'status': 'running' if status['running'] else 'stopped',
         'is_running': status['running'],
+        'is_healthy': status.get('is_healthy', False),
         'capital': status['capital'],
         'portfolio': {
             'open_positions': status['num_positions'],
@@ -101,6 +115,11 @@ def get_status():
             'win_rate': win_rate,
             'profit_factor': profit_factor,
             'total_pnl': status['profit']
+        },
+        'health': {
+            'last_heartbeat': status.get('last_heartbeat'),
+            'seconds_since_heartbeat': status.get('seconds_since_heartbeat', 0),
+            'status_message': health_message
         }
     })
 
