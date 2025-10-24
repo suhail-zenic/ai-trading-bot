@@ -85,7 +85,7 @@ def switch_to_paper():
     
     write_env(env_vars)
     
-    print(f"{GREEN}✓ Successfully switched to PAPER TRADING mode{RESET}")
+    print(f"{GREEN}[OK] Successfully switched to PAPER TRADING mode{RESET}")
     print(f"\n{BOLD}Paper Trading Info:{RESET}")
     print(f"  • No real money will be used")
     print(f"  • Trades are simulated")
@@ -96,14 +96,14 @@ def switch_to_paper():
 def switch_to_live():
     """Switch to live trading mode"""
     print(f"\n{RED}{'='*60}{RESET}")
-    print(f"{RED}{BOLD}⚠️  SWITCHING TO LIVE TRADING MODE ⚠️{RESET}")
+    print(f"{RED}{BOLD}[WARN] SWITCHING TO LIVE TRADING MODE [WARN]{RESET}")
     print(f"{RED}{'='*60}{RESET}\n")
     
     env_vars = read_env()
     
     # Check API keys
     if not env_vars.get('BINANCE_API_KEY') or not env_vars.get('BINANCE_API_SECRET'):
-        print(f"{RED}✗ ERROR: Binance API keys not configured!{RESET}")
+        print(f"{RED}[ERROR] Binance API keys not configured!{RESET}")
         print(f"\n{YELLOW}Please add your API keys to .env file:{RESET}")
         print(f"  BINANCE_API_KEY=your_api_key")
         print(f"  BINANCE_API_SECRET=your_api_secret")
@@ -111,7 +111,7 @@ def switch_to_live():
         return False
     
     # Safety warnings
-    print(f"{BOLD}⚠️  IMPORTANT WARNINGS:{RESET}")
+    print(f"{BOLD}[WARN] IMPORTANT WARNINGS:{RESET}")
     print(f"{RED}  • This will use REAL MONEY from your Binance account{RESET}")
     print(f"{RED}  • Losses are REAL and PERMANENT{RESET}")
     print(f"{RED}  • Make sure you understand the risks{RESET}")
@@ -130,7 +130,7 @@ def switch_to_live():
     confirmation1 = input().strip()
     
     if confirmation1 != 'LIVE TRADING':
-        print(f"\n{GREEN}✓ Cancelled - staying in safe mode{RESET}\n")
+        print(f"\n{GREEN}[OK] Cancelled - staying in safe mode{RESET}\n")
         return False
     
     print(f"\n{RED}{BOLD}Are you ABSOLUTELY SURE? This uses REAL MONEY!{RESET}")
@@ -138,14 +138,14 @@ def switch_to_live():
     confirmation2 = input().strip()
     
     if confirmation2 != 'YES I UNDERSTAND THE RISKS':
-        print(f"\n{GREEN}✓ Cancelled - staying in safe mode{RESET}\n")
+        print(f"\n{GREEN}[OK] Cancelled - staying in safe mode{RESET}\n")
         return False
     
     print(f"\n{RED}{BOLD}Final confirmation - Type 'CONFIRM' to activate live trading:{RESET} ", end='')
     confirmation3 = input().strip()
     
     if confirmation3 != 'CONFIRM':
-        print(f"\n{GREEN}✓ Cancelled - staying in safe mode{RESET}\n")
+        print(f"\n{GREEN}[OK] Cancelled - staying in safe mode{RESET}\n")
         return False
     
     # All confirmations passed - switch mode
@@ -153,7 +153,7 @@ def switch_to_live():
     write_env(env_vars)
     
     print(f"\n{RED}{'='*60}{RESET}")
-    print(f"{RED}{BOLD}✓ LIVE TRADING MODE ACTIVATED{RESET}")
+    print(f"{RED}{BOLD}[LIVE] LIVE TRADING MODE ACTIVATED{RESET}")
     print(f"{RED}{'='*60}{RESET}")
     print(f"\n{YELLOW}Your bot will now place REAL orders using REAL money!{RESET}")
     print(f"\n{BOLD}Next steps:{RESET}")
@@ -175,11 +175,11 @@ def show_status():
     print(f"{BLUE}{'='*60}{RESET}\n")
     
     if current_mode == 'live':
-        print(f"{BOLD}Current Mode:{RESET} {RED}LIVE TRADING 🔴{RESET}")
-        print(f"{RED}⚠️  Using REAL money!{RESET}\n")
+        print(f"{BOLD}Current Mode:{RESET} {RED}LIVE TRADING [LIVE]{RESET}")
+        print(f"{RED}[WARN] Using REAL money!{RESET}\n")
     else:
-        print(f"{BOLD}Current Mode:{RESET} {GREEN}PAPER TRADING 📄{RESET}")
-        print(f"{GREEN}✓ Safe simulation mode{RESET}\n")
+        print(f"{BOLD}Current Mode:{RESET} {GREEN}PAPER TRADING [PAPER]{RESET}")
+        print(f"{GREEN}[OK] Safe simulation mode{RESET}\n")
     
     print(f"{BOLD}Configuration:{RESET}")
     print(f"  Capital: ${env_vars.get('INITIAL_CAPITAL', '10000')}")
@@ -190,7 +190,7 @@ def show_status():
     print(f"  Cycle Time: {env_vars.get('TRADING_CYCLE_MINUTES', '30')} minutes")
     
     api_configured = bool(env_vars.get('BINANCE_API_KEY') and env_vars.get('BINANCE_API_SECRET'))
-    print(f"  API Keys: {'✓ Configured' if api_configured else '✗ Not configured'}\n")
+    print(f"  API Keys: {'[OK] Configured' if api_configured else '[X] Not configured'}\n")
 
 def main():
     print(f"\n{BOLD}{BLUE}AI Trading Bot - Mode Switcher{RESET}\n")
