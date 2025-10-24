@@ -172,17 +172,17 @@ class SimpleTradingBot:
                         test_mode=False  # REAL ORDER
                     )
                     
-                    if order and order.get('id'):
+                    if order and order.get('success'):
                         logger.info(f"[OK] Real order placed on Binance!")
-                        logger.info(f"     Order ID: {order['id']}")
+                        logger.info(f"     Order ID: {order.get('order_id', 'N/A')}")
                         logger.info(f"     Status: {order.get('status', 'unknown')}")
                         
                         # Use actual filled price if available
-                        actual_price = float(order.get('price', price))
+                        actual_price = float(order.get('average', order.get('price', price)))
                         actual_amount = float(order.get('filled', amount))
                         actual_cost = float(order.get('cost', position_value))
                         
-                        logger.info(f"     Filled: {actual_amount:.8f} BTC @ ${actual_price:.2f}")
+                        logger.info(f"     Filled: {actual_amount:.8f} @ ${actual_price:.2f} = ${actual_cost:.2f}")
                         
                         # Update with actual values
                         price = actual_price
@@ -268,17 +268,17 @@ class SimpleTradingBot:
                         test_mode=False  # REAL ORDER
                     )
                     
-                    if order and order.get('id'):
+                    if order and order.get('success'):
                         logger.info(f"[OK] Real SELL order placed on Binance!")
-                        logger.info(f"     Order ID: {order['id']}")
+                        logger.info(f"     Order ID: {order.get('order_id', 'N/A')}")
                         logger.info(f"     Status: {order.get('status', 'unknown')}")
                         
                         # Use actual filled values
-                        actual_price = float(order.get('price', price))
+                        actual_price = float(order.get('average', order.get('price', price)))
                         actual_amount = float(order.get('filled', amount))
                         actual_value = float(order.get('cost', position_value))
                         
-                        logger.info(f"     Sold: {actual_amount:.8f} BTC @ ${actual_price:.2f} = ${actual_value:.2f}")
+                        logger.info(f"     Sold: {actual_amount:.8f} @ ${actual_price:.2f} = ${actual_value:.2f}")
                         
                         # Recalculate P&L with actual values
                         profit = actual_value - entry_value
