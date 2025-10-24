@@ -250,19 +250,8 @@ class SimpleTradingBot:
                 logger.error(f"Error checking SL/TP for {symbol}: {e}", exc_info=True)
     
     def trading_cycle(self):
-        """Main trading cycle with timeout protection"""
-        import signal
-        
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Trading cycle timeout - exceeded 5 minutes")
-        
+        """Main trading cycle"""
         try:
-            # Set a 5-minute timeout for the entire cycle (longer than cycle interval to be safe)
-            # This prevents the cycle from hanging indefinitely
-            if hasattr(signal, 'SIGALRM'):  # Unix-like systems
-                signal.signal(signal.SIGALRM, timeout_handler)
-                signal.alarm(300)  # 5 minutes timeout
-            
             logger.info(f"=== TRADING CYCLE - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ===")
             
             # Check existing positions for stop loss / take profit
@@ -329,17 +318,10 @@ class SimpleTradingBot:
             # Update heartbeat
             self.last_heartbeat = datetime.now()
             
-        except TimeoutError as e:
-            logger.error(f"Trading cycle timeout: {e}")
-            logger.error("Cycle took too long - skipping to next cycle")
-            self.last_heartbeat = datetime.now()
         except Exception as e:
             logger.error(f"Error in trading cycle: {e}", exc_info=True)
             self.last_heartbeat = datetime.now()
         finally:
-            # Cancel the alarm
-            if hasattr(signal, 'SIGALRM'):
-                signal.alarm(0)
             # Flush logs to ensure they're written
             for handler in logging.root.handlers:
                 if hasattr(handler, 'flush'):
