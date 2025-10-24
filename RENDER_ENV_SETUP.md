@@ -21,6 +21,24 @@ Key: BINANCE_API_SECRET
 Value: [paste your actual API secret from Binance]
 ```
 
+### 2.5. Proxy Configuration (REQUIRED if Binance is blocked in your region)
+
+⚠️ **If you get HTTP 451 error**, Binance is blocked. Add proxy:
+
+```
+Key: HTTPS_PROXY
+Value: http://username:password@proxy-server.com:port
+```
+
+```
+Key: HTTP_PROXY
+Value: http://username:password@proxy-server.com:port
+```
+
+**Recommended Proxy Service:** Webshare.io ($2.99/month) - https://www.webshare.io
+
+See `BINANCE_REGION_FIX.md` for detailed instructions.
+
 ### 3. Trading Configuration
 ```
 Key: INITIAL_CAPITAL
