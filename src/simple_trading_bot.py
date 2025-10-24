@@ -136,6 +136,46 @@ class SimpleTradingBot:
             position_value = self.capital * POSITION_SIZE_PCT
             amount = position_value / price
             
+            # LIVE MODE: Place REAL order on Binance
+            if TRADING_MODE == 'live':
+                logger.warning(f"[LIVE] Placing REAL BUY order on Binance for {symbol}")
+                logger.warning(f"[LIVE] Amount: {amount:.8f} BTC | Value: ${position_value:.2f} USDT")
+                
+                try:
+                    # Place market order on Binance
+                    order = self.data_fetcher.place_market_order(
+                        symbol=symbol,
+                        side='buy',
+                        amount=amount,
+                        test_mode=False  # REAL ORDER
+                    )
+                    
+                    if order and order.get('id'):
+                        logger.info(f"[OK] Real order placed on Binance!")
+                        logger.info(f"     Order ID: {order['id']}")
+                        logger.info(f"     Status: {order.get('status', 'unknown')}")
+                        
+                        # Use actual filled price if available
+                        actual_price = float(order.get('price', price))
+                        actual_amount = float(order.get('filled', amount))
+                        actual_cost = float(order.get('cost', position_value))
+                        
+                        logger.info(f"     Filled: {actual_amount:.8f} BTC @ ${actual_price:.2f}")
+                        
+                        # Update with actual values
+                        price = actual_price
+                        amount = actual_amount
+                        position_value = actual_cost
+                    else:
+                        logger.error(f"[FAIL] Order failed on Binance: {order}")
+                        return False
+                        
+                except Exception as e:
+                    logger.error(f"[FAIL] Binance order failed: {e}", exc_info=True)
+                    return False
+            else:
+                logger.info(f"[PAPER] Simulated BUY order (no real trade)")
+            
             # Set stop loss and take profit
             stop_loss = price * (1 - STOP_LOSS_PCT)
             take_profit = price * (1 + TAKE_PROFIT_PCT)
@@ -163,11 +203,11 @@ class SimpleTradingBot:
             }
             self.trades.append(trade)
             
-            logger.info(f"BUY {symbol} - Amount: {amount:.4f} @ ${price:.2f} | SL: ${stop_loss:.2f} | TP: ${take_profit:.2f}")
+            logger.info(f"BUY {symbol} - Amount: {amount:.8f} @ ${price:.2f} | SL: ${stop_loss:.2f} | TP: ${take_profit:.2f}")
             return True
             
         except Exception as e:
-            logger.error(f"Error executing buy for {symbol}: {e}")
+            logger.error(f"Error executing buy for {symbol}: {e}", exc_info=True)
             return False
     
     def execute_sell(self, symbol, price):
@@ -185,6 +225,46 @@ class SimpleTradingBot:
             entry_value = amount * entry_price
             profit = position_value - entry_value
             profit_pct = (profit / entry_value) * 100
+            
+            # LIVE MODE: Place REAL sell order on Binance
+            if TRADING_MODE == 'live':
+                logger.warning(f"[LIVE] Placing REAL SELL order on Binance for {symbol}")
+                logger.warning(f"[LIVE] Amount: {amount:.8f} BTC | Expected: ${position_value:.2f} USDT")
+                
+                try:
+                    # Place market order on Binance
+                    order = self.data_fetcher.place_market_order(
+                        symbol=symbol,
+                        side='sell',
+                        amount=amount,
+                        test_mode=False  # REAL ORDER
+                    )
+                    
+                    if order and order.get('id'):
+                        logger.info(f"[OK] Real SELL order placed on Binance!")
+                        logger.info(f"     Order ID: {order['id']}")
+                        logger.info(f"     Status: {order.get('status', 'unknown')}")
+                        
+                        # Use actual filled values
+                        actual_price = float(order.get('price', price))
+                        actual_amount = float(order.get('filled', amount))
+                        actual_value = float(order.get('cost', position_value))
+                        
+                        logger.info(f"     Sold: {actual_amount:.8f} BTC @ ${actual_price:.2f} = ${actual_value:.2f}")
+                        
+                        # Recalculate P&L with actual values
+                        profit = actual_value - entry_value
+                        profit_pct = (profit / entry_value) * 100
+                        position_value = actual_value
+                    else:
+                        logger.error(f"[FAIL] SELL order failed on Binance: {order}")
+                        return False
+                        
+                except Exception as e:
+                    logger.error(f"[FAIL] Binance SELL order failed: {e}", exc_info=True)
+                    return False
+            else:
+                logger.info(f"[PAPER] Simulated SELL order (no real trade)")
             
             # Update capital
             self.capital += position_value
@@ -205,11 +285,11 @@ class SimpleTradingBot:
             # Remove position
             del self.positions[symbol]
             
-            logger.info(f"SELL {symbol} - Amount: {amount:.4f} @ ${price:.2f} | Profit: ${profit:.2f} ({profit_pct:.2f}%)")
+            logger.info(f"SELL {symbol} - Amount: {amount:.8f} @ ${price:.2f} | Profit: ${profit:.2f} ({profit_pct:.2f}%)")
             return True
             
         except Exception as e:
-            logger.error(f"Error executing sell for {symbol}: {e}")
+            logger.error(f"Error executing sell for {symbol}: {e}", exc_info=True)
             return False
     
     def check_stop_loss_take_profit(self):
