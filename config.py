@@ -56,6 +56,14 @@ INITIAL_CAPITAL = float(os.getenv('INITIAL_CAPITAL', '10000'))  # Default 10000 
 TRADING_MODE = os.getenv('TRADING_MODE', 'paper')
 TRADING_PAIRS = os.getenv('TRADING_PAIRS', 'BTC/USDT,ETH/USDT').split(',')  # High liquidity pairs only
 
+# Exchange selection (use 'auto' to try all exchanges, or specify: 'binance', 'kucoin', 'okx', 'bybit', 'kraken')
+EXCHANGE = os.getenv('EXCHANGE', 'auto')
+
+# Proxy settings (for accessing Binance from restricted regions)
+# Format: http://username:password@host:port or https://host:port
+HTTP_PROXY = os.getenv('HTTP_PROXY', '')
+HTTPS_PROXY = os.getenv('HTTPS_PROXY', '')
+
 # Position sizing - adjust based on your capital
 # For small capital (<50 USDT): use 0.30-0.40 (30-40%)
 # For medium capital (50-500 USDT): use 0.15-0.20 (15-20%)

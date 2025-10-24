@@ -21,6 +21,17 @@ class MarketDataFetcher:
             self.exchange.secret = self.config.BINANCE_API_SECRET
             logger.info("API credentials configured for authenticated requests")
         
+        # Configure proxy if set (for accessing Binance from restricted regions)
+        from config import HTTP_PROXY, HTTPS_PROXY
+        if HTTP_PROXY or HTTPS_PROXY:
+            proxies = {}
+            if HTTP_PROXY:
+                proxies['http'] = HTTP_PROXY
+            if HTTPS_PROXY:
+                proxies['https'] = HTTPS_PROXY
+            self.exchange.proxies = proxies
+            logger.info(f"Proxy configured for exchange access")
+        
     def _initialize_exchange(self):
         """Initialize exchange connection with automatic fallback"""
         # Try exchanges in order - Binance first (works for most regions)
